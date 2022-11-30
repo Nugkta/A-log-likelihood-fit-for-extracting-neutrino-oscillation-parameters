@@ -115,9 +115,11 @@ def lamb(u, var_fit, theta_23 = theta_23, E = e_list, m_23_2 = m_23_2):
     if var_fit == 'theta_23':
         PDF = pdf(theta_23 = u, E = e_list, L = L,  m_23_2 = m_23_2 )
 
-    elif var_fit == 'th&m': # fitting both theta 23 and m_23_2
+    elif var_fit == 'th&m': # changiong both theta 23 and m_23_2
         PDF = pdf(theta_23 = u[0], E = e_list, L = L,  m_23_2 = u[1] )
-    
+    elif var_fit == 'm_23_2':
+        #print(u, type(u))
+        PDF = pdf( m_23_2 = u, theta_23 = theta_23, E = e_list, L = L)
     
     else: 
         print('please input correct variable name')
@@ -131,13 +133,13 @@ def lamb(u, var_fit, theta_23 = theta_23, E = e_list, m_23_2 = m_23_2):
 
 # the NLL function
 # did not include the factorial term
-def NLL(u, m, var_fit):   # u is the parameters for minimisation, m is the experimental data
+def NLL(u, m, var_fit, theta_23 = theta_23, E = e_list, m_23_2 = m_23_2):   # u is the parameters for minimisation, m is the experimental data
     '''
     the negative log likihood function
     takes in vector of parameters, the experimental values and the names of variables to fit
     returns the negative log likelihood
     '''
-    val = sum( lamb(u, var_fit) - m * np.log(lamb(u, var_fit)) )
+    val = sum( lamb(u, var_fit, theta_23 = theta_23, E = e_list, m_23_2 = m_23_2) - m * np.log(lamb(u, var_fit, theta_23 = theta_23, E = e_list, m_23_2 = m_23_2)) )
     return val
 
 
@@ -184,14 +186,16 @@ def new_point_para(init_points, func):
 
 
 
-def minimise_para(func, init_guess):
+def minimise_para(func, init_guess_single):
     '''
     This is the 1D parabolic minimization function
     It takes in the name of the function(of only one parameter) and a set of initial guess as a list.
     Outputs the value of the parameter tjhat minimizes the function
     '''
     
-    x0, x1, x2 = init_guess
+    x0, x1, x2 = init_guess_single, init_guess_single + .05, init_guess_single -.05
+    init_guess = [x0, x1, x2]
+    
     val_list = [func(x0), func(x1), func(x2)]
     #print(111111,max(val_list) - min(val_list))
     while max(val_list) - min(val_list) > 1e-4: # convergin criterion is 1e-4
@@ -203,10 +207,10 @@ def minimise_para(func, init_guess):
         val_list.pop(posi_max)
     return init_guess[2]
 
-NLL_1D_theta_23 = lambda theta_23: NLL(theta_23, data_oe, 'theta_23') # only consider NLL of 1D minimization, parameter to fit is theta_23, and the experimental data is the given one.
+NLL_1D_theta_23 = lambda theta_23: NLL(theta_23, data_oe, 'theta_23', m_23_2 = m_23_2) # only consider NLL of 1D minimization, parameter to fit is theta_23, and the experimental data is the given one.
 
 #%% The first minimum
-min1 = minimise_para(NLL_1D_theta_23, [0.5, .6, .78])
+min1 = minimise_para(NLL_1D_theta_23, .6)
 
 # The second minimum
 # min2 = minimise_para(NLL_1D_theta_23, [0.8, .85, .9])
@@ -325,27 +329,31 @@ print(r'the minimum is at theta_23 = ', min1)
 
 #%% Finding the curvature around the minimum ???
 
-def minimise_para_cur(func, init_guess):
+def minimise_para_cur(func, init_guess_single):
     '''
     This is the revised version of 1D parabolic minimization function
     it returns the last three points that converges
     '''
     
-    x0, x1, x2 = init_guess
+    x0, x1, x2 = init_guess_single, init_guess_single+ 1e-5, init_guess_single - 1e-5
+    init_guess = [x0, x1, x2]
     val_list = [func(x0), func(x1), func(x2)]
     #print(111111,max(val_list) - min(val_list))
     while max(val_list) - min(val_list) > 1e-4: # convergin criterion is 1e-4
         x3 = new_point_para(init_guess, func)
+        # print(1111111111111, x3)
         init_guess.append(x3)
         val_list.append(func(x3))
+        # print(3333333333333, val_list)
         posi_max = val_list.index(max(val_list))
         init_guess.pop(posi_max)
         val_list.pop(posi_max)
-    return init_guess
+        # print(222222222222, max(val_list) - min(val_list))
+    return init_guess[2], init_guess
 
 
 
-points = minimise_para_cur(NLL_1D_theta_23, [0.5, .6, .78])
+val, points = minimise_para_cur(NLL_1D_theta_23, .6)
 points.sort()
 
 p0, p1, p2 = points
@@ -404,7 +412,9 @@ print('the error is estimated by curvature to be:', err)
 #     NLL_2D_list.append(val)
     
 
-#%%
+#%% 
+# Before choosing which variable to minimize, first plotting the 2D contour map
+# to observe the shape
 
 # getting the data for the contour map
 N = 100
@@ -436,6 +446,96 @@ plt.ylabel(r'$\theta_{23}$')
 plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ ')
 
 
+#%% 4.1 The univariate method
+
+
+d = 5
+ig = [.9, .002]     #[theta_23, m_23]
+#ig = [.9, .001] 
+path_x = [ig[0]]
+path_y = [ig[1]]
+while d > 1e-5:
+    NLL_1D_m = lambda m_23_2: NLL(m_23_2, var_fit = 'm_23_2' ,m = data_oe ,theta_23 = ig[0])
+    m_e, m_e_list = minimise_para_cur(NLL_1D_m, ig[1])
+    # print(1111111111)
+    NLL_m_temp = NLL_1D_m(m_e)
+    ig[1] = m_e
+    path_x.append(ig[0])
+    path_y.append(ig[1])
+    
+    NLL_1D_t = lambda theta_23: NLL(theta_23, m = data_oe, var_fit = 'theta_23', m_23_2 = ig[1])
+    t_e, t_e_list = minimise_para_cur(NLL_1D_t, ig[0])
+    # print(222222222 )
+    ig = [t_e, m_e]
+    d =  NLL_m_temp - NLL_1D_t(t_e)
+    path_x.append(ig[0])
+    path_y.append(ig[1])
+    #print(d)
+
+
+#%% Finding the accuracy usiong the curvature
+def find_err_cur(points, func):
+    p0, p1, p2 = points
+    
+    f0 = func(p0)
+    f1 = func(p1)
+    f2 = func(p2)
+    
+    d0 = (f1 - f0) / (p1 - p0)
+    d1 = (f2 - f1) / (p2 - p1)
+    
+    cur = 2 * (d1 - d0) / (p2-p0)
+    
+    err = np.sqrt(1 / cur)
+    return err
+
+m_err = find_err_cur(m_e_list, NLL_1D_m)
+t_err = find_err_cur(t_e_list, NLL_1D_t)
+
+print('The value of m_23_2 is %.5f +- %.5f'%(m_e, m_err))
+
+print('The value of theta_23 is %.2f +- %.2f'%(t_e, t_err))
+
+
+
+#%% Plotting the path of univariate method
+
+cs = plt.contourf(X, Y, Z, 15 , 
+                  #hatches =['-', '/','\\', '//'],
+                  cmap ='Greens')
+plt.locator_params(axis='both', nbins=6)
+cbar = plt.colorbar(cs, label = 'Magnitude of NLL')
+plt.xlabel(r'$\Delta m_{23}^2$')
+plt.ylabel(r'$\theta_{23}$')
+plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ ')
+
+plt.plot(path_y,path_x,  'r-', label = 'the convergent path')
+plt.legend()
+
+plt.locator_params(axis='both', nbins=6)
+plt.show()
+
+#%% Plot a Zoomed in plot of path of univariate
+
+cs = plt.contourf(X, Y, Z, 15 , 
+                  #hatches =['-', '/','\\', '//'],
+                  cmap ='Greens')
+plt.locator_params(axis='both', nbins=6)
+cbar = plt.colorbar(cs, label = 'Magnitude of NLL')
+plt.xlabel(r'$\Delta m_{23}^2$')
+plt.ylabel(r'$\theta_{23}$')
+plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ ')
+
+
+plt.plot(path_y,path_x,  'r-', label = 'the convergent path')
+
+plt.xlim([0.0022, 0.00235])
+plt.ylim([0.79, 0.81])
+plt.legend()
+
+plt.locator_params(axis='both', nbins=4)
+
+plt.show()
 
 
 
@@ -446,6 +546,45 @@ plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ ')
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#%%
+N = 100
+NLL_1D_m = lambda m_23_2: NLL(m_23_2, var_fit = 'm_23_2' ,m = data_oe ,theta_23 = np.pi/3)
+m_e = minimise_para_cur(NLL_1D_m, .002)
+
+
+
+#%% Visualising the m only
+NLL_m_list = []
+m_list = np.linspace(.001, .005, N)     
+for i in range(N):
+    NLL_m_list.append(NLL_1D_m(m_list[i]))
+plt.plot(m_list, NLL_m_list)
+
+
+
+
+#%%
+NLL_1D_t = lambda t_23: NLL(t_23, var_fit = 'theta_23' ,m = data_oe ,m_23_2 = 0.0024)
+t_e = minimise_para_cur(NLL_1D_t, ig[0])
 
 
 
