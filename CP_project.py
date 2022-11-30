@@ -7,7 +7,7 @@ Created on Fri Nov 25 15:58:20 2022
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-
+from matplotlib import ticker, cm
 
 #setting plotting defaults
 
@@ -108,19 +108,23 @@ e_list = np.linspace(0.025,9.975,200)
 # calculating expected osci_simu data at each energy interval
 # u:the parameters to fit
 # var_fit : tell the function to intake which variable 
-def lamb(u, var_fit):
+def lamb(u, var_fit, theta_23 = theta_23, E = e_list, m_23_2 = m_23_2):
     '''
     This function takes in parameters and output the corresponding ocsi_simu data(expected values)
     '''
     if var_fit == 'theta_23':
         PDF = pdf(theta_23 = u, E = e_list, L = L,  m_23_2 = m_23_2 )
-        osci_simu = PDF * data_us
-        #PDF = lambda theta_23: pdf(theta_23, E = e_list, L = L,  m_23_2 = m_23_2) * data_us
-        # osci_simu = PDF * data_us
-        return osci_simu
+
+    elif var_fit == 'th&m': # fitting both theta 23 and m_23_2
+        PDF = pdf(theta_23 = u[0], E = e_list, L = L,  m_23_2 = u[1] )
+    
+    
     else: 
         print('please input correct variable name')
-    
+    osci_simu = PDF * data_us
+    #PDF = lambda theta_23: pdf(theta_23, E = e_list, L = L,  m_23_2 = m_23_2) * data_us
+    # osci_simu = PDF * data_us
+    return osci_simu
 
 
 
@@ -197,7 +201,7 @@ def minimise_para(func, init_guess):
         posi_max = val_list.index(max(val_list))
         init_guess.pop(posi_max)
         val_list.pop(posi_max)
-    return init_guess[0]
+    return init_guess[2]
 
 NLL_1D_theta_23 = lambda theta_23: NLL(theta_23, data_oe, 'theta_23') # only consider NLL of 1D minimization, parameter to fit is theta_23, and the experimental data is the given one.
 
@@ -319,6 +323,117 @@ print('the standard deviation is ', sd_test)
 print(r'the minimum is at theta_23 = ', min1)
 
 
+#%% Finding the curvature around the minimum ???
+
+def minimise_para_cur(func, init_guess):
+    '''
+    This is the revised version of 1D parabolic minimization function
+    it returns the last three points that converges
+    '''
+    
+    x0, x1, x2 = init_guess
+    val_list = [func(x0), func(x1), func(x2)]
+    #print(111111,max(val_list) - min(val_list))
+    while max(val_list) - min(val_list) > 1e-4: # convergin criterion is 1e-4
+        x3 = new_point_para(init_guess, func)
+        init_guess.append(x3)
+        val_list.append(func(x3))
+        posi_max = val_list.index(max(val_list))
+        init_guess.pop(posi_max)
+        val_list.pop(posi_max)
+    return init_guess
+
+
+
+points = minimise_para_cur(NLL_1D_theta_23, [0.5, .6, .78])
+points.sort()
+
+p0, p1, p2 = points
+
+f0 = NLL_1D_theta_23(p0)
+f1 = NLL_1D_theta_23(p1)
+f2 = NLL_1D_theta_23(p2)
+
+d0 = (f1 - f0) / (p1 - p0)
+d1 = (f2 - f1) / (p2 - p1)
+
+cur = 2 * (d1 - d0) / (p2-p0)
+
+err = np.sqrt(1 / cur)
+print(err)
+
+
+#%% Finding the curvature again using numerical calculus
+f0 = NLL_1D_theta_23(min1 - 1e-4)
+f1 = NLL_1D_theta_23(min1)
+f2 = NLL_1D_theta_23(min1 + 1e-4)
+
+cur = (f2- 2*f1 + f0) / (2 * 1e-4)**2 
+
+err = np.sqrt(1 / cur)
+print('the error is estimated by curvature to be:', err)
+
+
+ 
+#%% 4. Two-dimensional minimisation
+
+# 4.1 The univariate method
+
+
+
+#%%
+
+# First trying to plot the 2D NLL of m_23_2 and theta_23
+
+# thm_list = np.linspace((0.025, 0.001), (9.975, 0.029), 1000)
+# thm_list = np.zeros((10000,2))
+# th_list = np.linspace(.025, 9.975, 100)
+# m_list = np.linspace(.001, .029, 100)
+
+# for i in range(len(th_list)):
+#     for j in range(len( m_list)):
+#         thm_list[100 * i + j] = np.array([th_list[i],m_list[j]])
+
+
+# #%%
+
+# NLL_2D_list = []
+
+# for i in thm_list:
+#     val = NLL(i, data_oe, 'th&m')
+#     NLL_2D_list.append(val)
+    
+
+#%%
+
+# getting the data for the contour map
+N = 100
+
+m_list = np.linspace(.001, .005, N)           
+th_list = np.linspace(.55, 1, N)       
+
+       
+X, Y = np.meshgrid(m_list, th_list)
+Z_t = np.ones((N,N))
+
+Z = np.zeros((N,N))
+for i in range(N):
+    for j in range(N):
+        #print([th_list[i], m_list[j]])
+        Z[j,i] = NLL([th_list[j], m_list[i]], data_oe, 'th&m')
+        # Note that the index and coordinate are inver in order
+        
+# plotting the contour map      
+        
+       
+cs = plt.contourf(X, Y, Z, 15 , 
+                  #hatches =['-', '/','\\', '//'],
+                  cmap ='Greens')
+plt.locator_params(axis='both', nbins=6)
+cbar = plt.colorbar(cs, label = 'Magnitude of NLL')
+plt.xlabel(r'$\Delta m_{23}^2$')
+plt.ylabel(r'$\theta_{23}$')
+plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ ')
 
 
 
@@ -340,6 +455,16 @@ print(r'the minimum is at theta_23 = ', min1)
 
 
 
+#%%
+# plt.scatter(X , Y, Z, cmap = 'bwr_r')
+
+
+
+
+
+#%%
+
+# plt.contour([thm_list[:,0],thm_list[: , 1 ],] NLL_2D_list, cmap = 'bwr_r')
 
 
 
@@ -355,6 +480,30 @@ print(r'the minimum is at theta_23 = ', min1)
 
 
 
+
+# #%%
+# import numpy as np
+# import matplotlib.pyplot as plt
+# from numpy import ma
+# from matplotlib import ticker, cm
+# N = 1000
+# x = np.linspace(-6.0, 6.0, N)
+# y = np.linspace(-7.0, 7.0, N)
+# X, Y = np.meshgrid(x, y)
+   
+# Z1 = np.exp(X * Y)
+# z = 50 * Z1
+# z[:5, :5] = -1
+# z = ma.masked_where(z <= 0, z)
+   
+# cs = plt.contourf(X, Y, z,
+#                   locator = ticker.LogLocator(),
+#                   cmap ="bone")
+  
+# cbar = plt.colorbar(cs)
+  
+# plt.title('matplotlib.pyplot.contourf() Example')
+# plt.show()
 
 
 
