@@ -51,6 +51,8 @@ def pdf(E, L, theta_23, m_23_2):
     #print(np.shape(x1))
     return val
 
+
+
 #%% Testing the funtion with some energy E
 
 # Testing the funtion with some energy E
@@ -447,11 +449,31 @@ plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ ')
 
 
 #%% 4.1 The univariate method
+'''
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+
+
+
+
+4.1 THEUNIVARIATE METHOD -------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+'''
+
 
 
 d = 5
-ig = [.9, .002]     #[theta_23, m_23]
-#ig = [.9, .001] 
+# ig = [.65, .003076]     #[theta_23, m_23]
+# ig = [.0, .002]
+
+ig = [.9, .002] 
+
 path_x = [ig[0]]
 path_y = [ig[1]]
 while d > 1e-5:
@@ -492,10 +514,11 @@ def find_err_cur(points, func):
 m_err = find_err_cur(m_e_list, NLL_1D_m)
 t_err = find_err_cur(t_e_list, NLL_1D_t)
 
-print('The value of m_23_2 is %.5f +- %.5f'%(m_e, m_err))
+print('Univarite Method: The value of m_23_2 is %.5f +- %.5f'%(m_e, m_err))
 
-print('The value of theta_23 is %.2f +- %.2f'%(t_e, t_err))
+print('Univarite Method: The value of theta_23 is %.2f +- %.2f'%(t_e, t_err))
 
+print('Univarite Method: The value of NLL is: ', NLL_1D_t(t_e))
 
 
 #%% Plotting the path of univariate method
@@ -507,7 +530,7 @@ plt.locator_params(axis='both', nbins=6)
 cbar = plt.colorbar(cs, label = 'Magnitude of NLL')
 plt.xlabel(r'$\Delta m_{23}^2$')
 plt.ylabel(r'$\theta_{23}$')
-plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ ')
+plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ (Univariate)')
 
 plt.plot(path_y,path_x,  'r-', label = 'the convergent path')
 plt.legend()
@@ -523,8 +546,9 @@ cs = plt.contourf(X, Y, Z, 15 ,
 plt.locator_params(axis='both', nbins=6)
 cbar = plt.colorbar(cs, label = 'Magnitude of NLL')
 plt.xlabel(r'$\Delta m_{23}^2$')
+
 plt.ylabel(r'$\theta_{23}$')
-plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ ')
+plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ Zoomed (Univariate)')
 
 
 plt.plot(path_y,path_x,  'r-', label = 'the convergent path')
@@ -539,6 +563,208 @@ plt.show()
 
 
 
+#%% 4.2 Simultaneous minimisation
+
+'''
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+
+4.2  NEWTON'S METHOD---------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+
+
+
+
+'''
+
+
+
+# Finding the gradient of a function numerically 
+def gradient(f, x, h0, h1):
+    '''
+    Function for finding the gradient of a function numerically
+    func: the function to find gradient for
+    x: the vector input of the function
+    h0: the step of the first variable
+    h1: the step of the second variable
+    
+    '''
+    var0 = x[0]
+    var1= x[1]
+    g1 = (f([var0 + h0, var1]) - f([var0, var1])) / h0
+    g2 = (f([var0, var1 + h1]) - f([var0, var1])) / h1
+    grad = np.array([g1,g2])
+    return grad
+# Findig the Hessian matrix of a function
+def hessian(f, x, h0, h1):
+    var0 = x[0]
+    var1= x[1]
+    f_xx = ( f([var0 + h0, var1]) - 2 * f([var0, var1]) + f([var0 - h0, var1]) ) / h0**2
+    f_yy = ( f([var0, var1 + h1]) - 2 * f([var0, var1]) + f([var0, var1 - h1]) ) / h1**2
+    f_xy = (f([x[0] + h0, x[1] + h1]) -f([x[0] + h0, x[1] - h1])- f([x[0] - h0, x[1] + h1]) + f([x[0] - h0, x[1] - h1])) / (4 * h0 * h1)
+    H = np.array([[f_xx, f_xy],
+                    [f_xy, f_yy]])
+    return H
+
+#%% the Newton iteration
+def inverse(M):
+    det = M[0][0]*M[1][1] - M[1][0]*M[0][1]
+    M_t = np.ones([2,2])
+    M_t[0][0] = M[1][1]
+    M_t[0][1] = -M[0][1]
+    M_t[1][0] = -M[1][0]
+    M_t[1][1] = M[0][0]
+    M_inv = M_t / det
+    return M_inv
+
+#%%
+
+def Newton(f, ig, h0, h1):
+    x = ig
+    diff = 10
+    path_th = [ig[0]]
+    path_m = [ig[1]]
+    while diff > 1e-5:
+    #for i in range(it):
+
+        H = hessian(f, x, h0, h1)
+        grad =  gradient(f, x, h0, h1)
+        x_new = x - inverse(H) @ grad 
+        diff = np.linalg.norm(x - x_new)
+        path_th.append(x_new[0])
+        path_m.append(x_new[1])
+        x = x_new
+        #print(x)
+    return x, path_th, path_m
+
+
+NLL_2D = lambda u: NLL(u, data_oe, 'th&m')
+
+ig = [0.9, 0.002]
+h0 = 1e-5
+h1 = 1e-5
+
+
+u, path_x, path_y = Newton(NLL_2D, ig, h0, h1)
+
+#%% Finding the accuracy of the result using the curvature method
+
+def cur(f, x, var):
+    var0 = x[0]
+    var1= x[1]
+    f_xx = ( f([var0 + h0, var1]) - 2 * f([var0, var1]) + f([var0 - h0, var1]) ) / h0**2
+    f_yy = ( f([var0, var1 + h1]) - 2 * f([var0, var1]) + f([var0, var1 - h1]) ) / h1**2
+    if var == 'x':
+        return f_xx
+    elif var == 'y':
+        return f_yy
+    else:
+        print('input correct variable for curvature')
+
+def find_err_cur2(f, x, h0 = 1e-4, h1 = 1e-4, var = None):
+    curv = cur(f, x, var)
+    err = np.sqrt(1/curv)
+    return err
+
+m_err_n = find_err_cur2(NLL_2D, u, h0 = 1e-4, h1 = 1e-4, var = 'y')
+th_err_n = find_err_cur2(NLL_2D, u, h0 = 1e-4, h1 = 1e-4, var = 'x')
+
+
+
+print('Newton Method: The value of m_23_2 is %.5f +- %.5f'%(u[1], m_err))
+
+print('Newton Method: The value of theta_23 is %.2f +- %.2f'%(u[0], t_err))
+
+print('Newton Method: The value of NLL is: ', NLL_2D(u))
+
+#%% Plotting the path of Newton method
+cs = plt.contourf(X, Y, Z, 15 , 
+                  #hatches =['-', '/','\\', '//'],
+                  cmap ='Greens')
+plt.locator_params(axis='both', nbins=6)
+cbar = plt.colorbar(cs, label = 'Magnitude of NLL')
+plt.xlabel(r'$\Delta m_{23}^2$')
+plt.ylabel(r'$\theta_{23}$')
+plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ (Newton) ')
+
+plt.plot(path_y,path_x,  'r-', label = 'the convergent path')
+plt.legend()
+
+plt.locator_params(axis='both', nbins=6)
+plt.show()
+
+
+
+#%% Plot a Zoomed in plot of path of univariate
+
+cs = plt.contourf(X, Y, Z, 15 , 
+                  #hatches =['-', '/','\\', '//'],
+                  cmap ='Greens')
+plt.locator_params(axis='both', nbins=6)
+cbar = plt.colorbar(cs, label = 'Magnitude of NLL')
+plt.xlabel(r'$\Delta m_{23}^2$')
+
+plt.ylabel(r'$\theta_{23}$')
+plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ Zoomed (Newton)')
+
+
+plt.plot(path_y,path_x,  'r-', label = 'the convergent path')
+
+plt.xlim([0.0022, 0.00235])
+plt.ylim([0.79, 0.81])
+plt.legend()
+
+plt.locator_params(axis='both', nbins=4)
+
+plt.show()
+
+
+#%%
+prob_e = pdf(e_list, L = L, theta_23 = u[0], m_23_2 = u[1])
+
+data_os_2 = prob_e * data_us
+plt.plot(e_list,data_os, 'r-', label = 'osci_simu data') # the previous osillating simulated pdf
+plt.plot(e_list,data_os_2, 'y-', label = 'osci_simu data(2D Newton fitted)')
+plt.xlabel('energy (GeV)')
+plt.ylabel('# of muons')
+plt.title('the osci_simu data vs. energy (Using 2D fit (Newton))')
+
+#adding the real data for comparison
+plt.bar(e_list,data_oe, width = .06, label = 'exp data')
+
+plt.legend()
+plt.show()
+
+
+
+
+
+
+#%% 4.3 MONTE-CARLO MINIMISATION
+'''
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+
+
+4.3 The Monte-Carlo minimisation--------------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+
+'''
 
 
 
@@ -552,6 +778,29 @@ plt.show()
 
 
 
+
+
+
+
+
+
+
+
+#%%
+def tf(u):
+    x = u[0]
+    y = u[1]
+    val = x**2 + y**2 + x*y
+    
+    return 9*x - 7*y
+
+
+    
+    
+    
+    
+    
+    
 
 
 
@@ -639,7 +888,7 @@ t_e = minimise_para_cur(NLL_1D_t, ig[0])
 #                   locator = ticker.LogLocator(),
 #                   cmap ="bone")
   
-# cbar = plt.colorbar(cs)
+# cbar = plt.colorbar(cs)Z
   
 # plt.title('matplotlib.pyplot.contourf() Example')
 # plt.show()
