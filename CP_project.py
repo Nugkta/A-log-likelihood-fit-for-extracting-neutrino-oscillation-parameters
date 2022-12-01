@@ -281,6 +281,11 @@ plt.show()
 
 
 def find_sd(func, x_list, x_val):
+    '''
+    Function for finding the standard deviation of the function around the minimum point
+    
+    '''
+    
     y_list = []
     
     for i in x_list:
@@ -495,7 +500,7 @@ while d > 1e-5:
     #print(d)
 
 
-#%% Finding the accuracy usiong the curvature
+#%% Finding the accuracy using the curvature
 def find_err_cur(points, func):
     p0, p1, p2 = points
     
@@ -766,18 +771,120 @@ plt.show()
 
 '''
 
+#%% The MOnte minimisation function
+
+def mon_car(f, ig, k, T_max, h):
+    path_th = [ig[0]]
+    path_m = [ig[1]]
+    
+    for T in range(T_max, 0, -1):
+        val = f(ig)
+        
+
+        
+        d0 = np.random.uniform(-h, h) * ig[0] + ig[0] # the normalised small step h, then times ig to maek sure the scale is consistent
+        d1 = np.random.uniform(-h, h) * ig[1] + ig[1]
+        val_new = f([d0, d1])
+        diff = val_new - val
+        
+        if diff <= 0:
+            ig[0], ig[1] = d0, d1
+            path_th.append(ig[0])
+            path_m.append(ig[1])
+        else:
+            print(diff, k, T)
+            p_acc = np.exp(-diff / (k * T))
+            rand = np.random.uniform(0, 1)
+            print(p_acc)
+            if rand < p_acc:
+                ig[0], ig[1] = d0, d1
+                path_th.append(ig[0])
+                path_m.append(ig[1])
+    return ig, path_th, path_m
+
+#%% Running the monte minimisation
+
+ig = [0.9, 0.002]
+k = 1e-5
+h = .1
+T_max = 1000
+
+u_monte, path_x_monte, path_y_monte = mon_car(NLL_2D, ig, k, T_max, h)
 
 
 
 
 
+#%% Plotting the path of monte method
+def plt_norm(): 
+    '''
+    function for plotting the background 2D NLL contour
+    '''
+    
+    cs = plt.contourf(X, Y, Z, 15 , 
+                      #hatches =['-', '/','\\', '//'],
+                      cmap ='Greens')
+    plt.locator_params(axis='both', nbins=6)
+    cbar = plt.colorbar(cs, label = 'Magnitude of NLL')
+    plt.xlabel(r'$\Delta m_{23}^2$')
+    plt.ylabel(r'$\theta_{23}$')
 
 
 
 
+plt_norm()
+plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ (Monte Carlo)')
+plt.plot(path_y_monte,path_x_monte,  'r-', label = 'the convergent path')
+plt.legend()
+plt.locator_params(axis='both', nbins=6)
+plt.show()
+
+
+#%% Plot a Zoomed in plot of path of monte
+def plt_zoom():
+    '''
+    function for plotting the zoomed version of background 2D NLL contour
+    '''
+    
+    cs = plt.contourf(X, Y, Z, 15 , 
+                      #hatches =['-', '/','\\', '//'],
+                      cmap ='Greens')
+    plt.locator_params(axis='both', nbins=6)
+    cbar = plt.colorbar(cs, label = 'Magnitude of NLL')
+    plt.xlabel(r'$\Delta m_{23}^2$')
+    
+    plt.ylabel(r'$\theta_{23}$')
+
+
+plt_zoom()
+plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ Zoomed (Monte)')
+
+plt.plot(path_y_monte,path_x_monte,  'r-', label = 'the convergent path')
+
+plt.xlim([0.0022, 0.00235])
+plt.ylim([0.76, 0.86])
+plt.legend()
+
+plt.locator_params(axis='both', nbins=4)
+
+plt.show()
 
 
 
+
+#%%
+
+
+m_err_n = find_err_cur2(NLL_2D, u_monte, h0 = 1e-4, h1 = 1e-4, var = 'y')
+th_err_n = find_err_cur2(NLL_2D, u_monte, h0 = 1e-4, h1 = 1e-4, var = 'x')
+
+
+
+print('Monte Method: The value of m_23_2 is %.5f +- %.5f'%(u_monte[1], m_err))
+
+print('Monte Method: The value of theta_23 is %.2f +- %.2f'%(u_monte[0], t_err))
+
+print('Monte Method: The value of NLL is: ', NLL_2D(u_monte))
 
 
 
