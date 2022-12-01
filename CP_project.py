@@ -880,11 +880,308 @@ th_err_n = find_err_cur2(NLL_2D, u_monte, h0 = 1e-4, h1 = 1e-4, var = 'x')
 
 
 
-print('Monte Method: The value of m_23_2 is %.5f +- %.5f'%(u_monte[1], m_err))
+print('Monte Method: The value of m_23_2 is %.5f +- %.5f'%(u_monte[1], m_err_n))
 
-print('Monte Method: The value of theta_23 is %.2f +- %.2f'%(u_monte[0], t_err))
+print('Monte Method: The value of theta_23 is %.2f +- %.2f'%(u_monte[0], th_err_n))
 
 print('Monte Method: The value of NLL is: ', NLL_2D(u_monte))
+
+
+
+
+
+
+#%% 3D minimisation
+
+'''
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+
+
+5. 3D Minimisation--------------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+
+'''
+
+
+#%% rewriting the lambda function and NLL function
+
+a = 10 # random number for default value
+
+def lamb_3D(u, var_fit, theta_23 = theta_23, E = e_list, m_23_2 = m_23_2):
+    '''
+    This function takes in parameters and output the corresponding ocsi_simu data(expected values)
+    '''
+    if var_fit == 'theta_23':
+        PDF = pdf(theta_23 = u, E = e_list, L = L,  m_23_2 = m_23_2 )
+
+    elif var_fit == 'th&m' or 'th&m&a': # changiong both theta 23 and m_23_2
+        # print(u)
+        PDF = pdf(theta_23 = u[0], E = e_list, L = L,  m_23_2 = u[1] )
+    elif var_fit == 'm_23_2':
+        #print(u, type(u))
+        PDF = pdf( m_23_2 = u, theta_23 = theta_23, E = e_list, L = L)
+    
+    else: 
+        print('please input correct variable name')
+    a = u[2]
+    # print(a, 11111111111111)
+    osci_simu = PDF * data_us
+    #PDF = lambda theta_23: pdf(theta_23, E = e_list, L = L,  m_23_2 = m_23_2) * data_us
+    # osci_simu = PDF * data_us
+    # plt.plot(e_list, osci_simu * a * E)
+    # plt.show()
+    return osci_simu * a * E
+    # return osci_simu 
+
+
+def NLL_new(u, m, var_fit, theta_23 = theta_23, E = e_list, m_23_2 = m_23_2):   # u is the parameters for minimisation, m is the experimental data
+    '''
+    the negative log likihood function
+    takes in vector of parameters, the experimental values and the names of variables to fit
+    returns the negative log likelihood
+    '''
+    # print(u, 2222222222222)
+    # print(lamb_3D(u, var_fit)[1:3], 1111111111111)
+    val = sum( lamb_3D(u, var_fit, theta_23 = theta_23, E = e_list, m_23_2 = m_23_2) 
+              - m * np.log(lamb_3D(u, var_fit, theta_23 = theta_23, E = e_list, m_23_2 = m_23_2)))
+    return val
+
+
+
+
+
+
+#%%
+
+NLL_3D = lambda u: NLL_new(u, m = data_oe, var_fit = 'th&m&a')
+print(NLL_3D([0.9, 0.002, 1]))
+
+alist = np.linspace(1, 2, 100)
+NLL_3D_list = []
+for i in alist:
+    vec = [0.77, 0.0023, i]
+    NLL_3D_list.append(NLL_3D(vec))
+    
+plt.plot(alist, NLL_3D_list)
+plt.ylabel('NLL_3D')
+plt.xlabel(r'$\alpha$')
+plt.title(r'NLL_3D vs. $\alpha$ with fixed $\Delta m _{23}^2$ and $\theta_{23}$')
+
+
+
+
+
+
+#%% Newton Minimisation 3D
+
+def hessian_3D(f, x, h):
+    
+    f_xx = (f([x[0] + h,x[1],x[2]])- 2*f([x[0], x[1],x[2]]) + f([x[0] - h,x[1],x[2]]))/(h*h)
+    f_xy =  (f([x[0]+ h, x[1] + h,x[2]]) -f([x[0]+ h, x[1]-h,x[2]])- f([x[0]- h, x[1] + h,x[2]])+f([x[0]- h, x[1]- h,x[2]]))/(4*h*h)
+    f_xz =  (f([x[0]+ h, x[1] ,x[2]+h]) -f([x[0]+ h, x[1],x[2]-h])- f([x[0]- h, x[1],x[2]+h])+f([x[0]- h, x[1],x[2]-h]))/(4*h*h)
+    
+    f_yy = (f([x[0], x[1] + h,x[2]]) -2*f([x[0], x[1],x[2]])+ f([x[0], x[1] - h,x[2]]))/(h*h)   
+    f_yz =  (f([x[0], x[1]+ h ,x[2]+h]) -f([x[0], x[1]+h,x[2]-h])- f([x[0], x[1]-h,x[2]+h])+f([x[0], x[1]-h,x[2]-h]))/(4*h*h)
+    
+    f_zz =(f([x[0], x[1] ,x[2]+h]) -2*f([x[0], x[1],x[2]])+ f([x[0], x[1] ,x[2]-h]))/(h*h)
+    
+    H = np.array([[f_xx,f_xy,f_xz],
+                  [f_xy,f_yy,f_yz],
+                  [f_xz,f_yz,f_zz]]) 
+
+    
+    return H
+    
+    
+    
+def gradient_3D(f, x, h):
+    
+    '''
+    Function for finding the gradient of a function numerically
+    func: the function to find gradient for
+    x: the vector input of the function
+    h0: the step of the first variable
+    h1: the step of the second variable
+    
+    '''
+    var0 = x[0]
+    var1 = x[1]
+    var2 = x[2]
+    g0 = (f([var0 + h, var1, var2]) - f([var0, var1, var2])) / h
+    g1 = (f([var0, var1 + h, var2]) - f([var0, var1, var2])) / h
+    g2 = (f([var0 , var1, var2 + h]) - f([var0, var1, var2])) / h
+    
+    grad = np.array([g0, g1, g2])
+    return grad    
+
+    
+
+
+
+
+
+import time
+
+
+
+def Newton_3D(f, ig, h):
+    x = ig
+    diff = 10
+    path_th = [ig[0]]
+    path_m = [ig[1]]
+    path_a = [ig[2]]
+    while diff > 1e-5:
+    #for i in range(it):
+        # print(x)
+        # time.sleep(.1)
+        H = hessian_3D(f, x, h)
+        # print(H,'HHHHHHHHHHHHHHHHH')
+        grad =  gradient_3D(f, x, h)
+        x_new = x - np.linalg.inv(H) @ grad 
+        diff = np.linalg.norm(x - x_new)
+        path_th.append(x_new[0])
+        path_m.append(x_new[1])
+        path_a.append(x_new[2])
+        x = x_new
+        #print(x)
+    return x, path_th, path_m, path_a
+
+
+ig_3D = [0.77, 0.002, 4] # initial guess of a set to be 1
+h = 1e-4
+
+
+
+#%%
+u_3D_newton, path_x, path_y, path_z = Newton_3D(NLL_3D, ig_3D, h)
+
+print('the minimum parameters are [a, theta_23, m_23_2] =', u_3D_newton)
+
+
+
+
+#%% FINDING THE ACCURACY
+def cur_3D(f, x, var, h):
+    var0 = x[0]
+    var1= x[1]
+    f_xx = (f([x[0] + h,x[1],x[2]])- 2*f([x[0], x[1],x[2]]) + f([x[0] - h,x[1],x[2]]))/(h*h)
+    f_yy = (f([x[0], x[1] + h,x[2]]) -2*f([x[0], x[1],x[2]])+ f([x[0], x[1] - h,x[2]]))/(h*h)   
+    f_zz =(f([x[0], x[1] ,x[2]+h]) -2*f([x[0], x[1],x[2]])+ f([x[0], x[1] ,x[2]-h]))/(h*h)
+    if var == 'x':
+        return f_xx
+    elif var == 'y':
+        return f_yy
+    elif var == 'z':
+        return f_zz
+    else:
+        print('input correct variable for curvature')
+
+def find_err_cur3(f, x, h = 1e-4, var = None):
+    curv = cur_3D(f, x, var, h)
+    err = np.sqrt(1/curv)
+    return err
+
+th_err_n = find_err_cur3(NLL_3D, u_3D_newton, h = 1e-4, var = 'x')
+m_err_n = find_err_cur3(NLL_3D, u_3D_newton, h = 1e-4, var = 'y')
+a_err_n = find_err_cur3(NLL_3D, u_3D_newton, h = 1e-4, var = 'z')
+
+
+print('Newton Method 3D: The value of m_23_2 is %.5f +- %.5f'%(u_3D_newton[1], m_err_n))
+
+print('Newton Method 3D: The value of theta_23 is %.2f +- %.2f'%(u_3D_newton[0], th_err_n))
+
+print('Newton Method 3D: The value of a is %.2f +- %.2f'%(u_3D_newton[2], a_err_n))
+
+print('Newton Method 3D: The value of NLL is: ', NLL_3D(u_3D_newton))
+
+
+
+
+
+
+#%% Plot the minimized comparison
+
+
+# 2D parameters fitting
+prob_e = pdf(e_list, L = L, theta_23 = u[0], m_23_2 = u[1])
+data_os_2 = prob_e * data_us
+
+# 3D parameters fitting
+data_os_3 = lamb_3D(u_3D_newton, var_fit = 'th&m&a')
+
+
+plt.plot(e_list,data_os, 'r-', label = 'osci_simu data') # the previous osillating simulated pdf
+plt.plot(e_list,data_os_2, 'y-', label = 'osci_simu data(2D Newton fitted)')
+plt.plot(e_list,data_os_3, 'k-', label = 'osci_simu data(3D Newton fitted)')
+
+
+plt.xlabel('energy (GeV)')
+plt.ylabel('# of muons')
+plt.title('the osci_simu data vs. energy (Using 2D fit (Newton))')
+
+#adding the real data for comparison
+plt.bar(e_list,data_oe, width = .06, label = 'exp data')
+
+plt.legend()
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#%%
+def tf2(x):
+    val = x[0]**3 + x[1]**2 + x[2] **2
+    
+    val1= x[0] + x[2] + x[1]
+    return val 
+
+
+
+print(hessian_3D(tf2, [9,9,9], 0.01))
+
+
+print(gradient_3D(tf2, [3,1,1], 0.001))
+
+
+
+
+
+
+
 
 
 
@@ -1001,18 +1298,48 @@ t_e = minimise_para_cur(NLL_1D_t, ig[0])
 # plt.show()
 
 
+#%%
+
+import matplotlib
+import matplotlib.cm as cmx
+from mpl_toolkits.mplot3d import Axes3D
+def scatter3d(x,y,z, cs, colorsMap='jet'):
+    cm = plt.get_cmap(colorsMap)
+    cNorm = matplotlib.colors.Normalize(vmin=min(cs), vmax=max(cs))
+    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.scatter(x, y, z, c=scalarMap.to_rgba(cs))
+    scalarMap.set_array(cs)
+    fig.colorbar(scalarMap)
+    plt.show()
 
 
 
 
+def cfunc(x,y,z):
+    val = x + y + z
+    return val
+ 
+    
+x = np.linspace(0,10,10)
+y= np.linspace(0,10,10)
+z= np.linspace(0,10,10)
 
 
 
+X,Y,Z = np.meshgrid(x,y,z)
 
+#%%
+c_list = np.zeros((10,10,10))
+#%%
+for i in range(10):
+    for j in range(10):
+        for k in range(10):
+            c_list[i][j][k] = cfunc(X[i][j][k], Y[i][j][k], Z[i][j][k])
 
-
-
-
+#%%
+scatter3d(np.ndarray.flatten(X),np.ndarray.flatten(Y),np.ndarray.flatten(Z), np.ndarray.flatten(c_list), colorsMap='jet')
 
 
 
