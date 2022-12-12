@@ -12,18 +12,18 @@ from matplotlib import ticker, cm
 #setting plotting defaults
 
 default = {'font.size': 15,
-          'figure.figsize': (10, 6)}
+          'figure.figsize': (8,6)}
 plt.rcParams.update(default) 
 
 #%% First plotting the histogram of the datra
 
 #data_oe stores the experimental data with oscillation
-#data_oe = np.loadtxt('data1.txt', skiprows = 2, max_rows = 200) # 200 data points
+
 data_oe = np.loadtxt('data.txt', skiprows = 2, max_rows = 200) # 200 data points
 
 
 #data_us stores the unoscillated simulated data
-#data_us = np.loadtxt('data1.txt', skiprows = 205, max_rows = 200)
+
 data_us = np.loadtxt('data.txt', skiprows = 205, max_rows = 200)
 
 #e_list is the coreesponding energy level of the data
@@ -212,8 +212,11 @@ def minimise_para(func, init_guess_single):
 NLL_1D_theta_23 = lambda theta_23: NLL(theta_23, data_oe, 'theta_23', m_23_2 = m_23_2) # only consider NLL of 1D minimization, parameter to fit is theta_23, and the experimental data is the given one.
 
 #%% The first minimum
+#%%time
 min1 = minimise_para(NLL_1D_theta_23, .6)
 
+
+#%%
 # The second minimum
 # min2 = minimise_para(NLL_1D_theta_23, [0.8, .85, .9])
 
@@ -234,7 +237,8 @@ plt.plot(min1, f_min1,'rx', label = 'min')
 
 plt.legend()
 plt.show()
-
+#%%
+print('the NLL_min = ',NLL_1D_theta_23(min1))
 
 #%% 3.5 Finding the accuracy of the test
 
@@ -544,6 +548,12 @@ plt.legend()
 plt.locator_params(axis='both', nbins=6)
 plt.show()
 
+#%%
+path_y_u,path_x_u = path_y,path_x
+
+
+
+
 #%% Plot a Zoomed in plot of path of univariate
 
 cs = plt.contourf(X, Y, Z, 15 , 
@@ -557,7 +567,7 @@ plt.ylabel(r'$\theta_{23}$')
 plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ Zoomed (Univariate)')
 
 
-plt.plot(path_y,path_x,  'r-', label = 'the convergent path')
+plt.plot(path_y,path_x,  'r-', label = 'Univariate path')
 
 plt.xlim([0.0022, 0.00235])
 plt.ylim([0.79, 0.81])
@@ -660,6 +670,9 @@ h1 = 1e-5
 
 u, path_x, path_y = Newton(NLL_2D, ig, h0, h1)
 
+#%%
+path_y_n,path_x_n = path_y,path_x
+
 #%% Finding the accuracy of the result using the curvature method
 
 def cur(f, x, var):
@@ -708,7 +721,7 @@ plt.show()
 
 
 
-#%% Plot a Zoomed in plot of path of univariate
+#%% Plot a Zoomed in plot of path of newton
 
 cs = plt.contourf(X, Y, Z, 15 , 
                   #hatches =['-', '/','\\', '//'],
@@ -721,7 +734,7 @@ plt.ylabel(r'$\theta_{23}$')
 plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ Zoomed (Newton)')
 
 
-plt.plot(path_y,path_x,  'r-', label = 'the convergent path')
+plt.plot(path_y,path_x,  'b-', label = 'Newton path')
 
 plt.xlim([0.0022, 0.00235])
 plt.ylim([0.79, 0.81])
@@ -810,8 +823,8 @@ T_max = 1000
 u_monte, path_x_monte, path_y_monte = mon_car(NLL_2D, ig, k, T_max, h)
 
 
-
-
+#%%
+path_y_m,path_x_m =  path_y_monte,path_x_monte
 
 #%% Plotting the path of monte method
 def plt_norm(): 
@@ -857,7 +870,7 @@ def plt_zoom():
 plt_zoom()
 plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ Zoomed (Monte)')
 
-plt.plot(path_y_monte,path_x_monte,  'r-', label = 'the convergent path')
+plt.plot(path_y_monte,path_x_monte,  'y-', label = 'Monte path')
 
 plt.xlim([0.0022, 0.00235])
 plt.ylim([0.76, 0.86])
@@ -1163,6 +1176,10 @@ scatter3d(np.ndarray.flatten(X3),np.ndarray.flatten(Y3),np.ndarray.flatten(Z3), 
 plt.plot(path_x, path_y, path_z, 'r-',linewidth=3)
 plt.plot(path_x[-1], path_y[-1], path_z[-1], 'ro', markersize = 10)
 plt.show()
+
+#%%
+path_x_n3, path_y_n3, path_z_n3 = path_x, path_y, path_z
+
 #%%
 # path_l = len(path_x)
 # path_f = []
@@ -1176,7 +1193,10 @@ plt.show()
 
 
 #%% Plot the minimized comparison of predicted PDF
+font = {
+        'size'   : 18}
 
+matplotlib.rc('font', **font)
 
 # 2D parameters fitting
 prob_e = pdf(e_list, L = L, theta_23 = u[0], m_23_2 = u[1])
@@ -1184,19 +1204,19 @@ data_os_2 = prob_e * data_us
 
 # 3D parameters fitting
 data_os_3 = lamb_3D(u_3D_newton, var_fit = 'th&m&a')
+plt.figure(figsize = (18,6))
+
+plt.plot(e_list,data_os, 'r-', label = 'fitted data', linewidth = 2.5) # the previous osillating simulated pdf
+plt.plot(e_list,data_os_2, 'y-', label = 'fitted data(2D Newton fitted)', linewidth = 2.5)
+plt.plot(e_list,data_os_3, 'k-', label = 'fitted data(3D Newton fitted)', linewidth = 2.5)
 
 
-plt.plot(e_list,data_os, 'r-', label = 'osci_simu data') # the previous osillating simulated pdf
-plt.plot(e_list,data_os_2, 'y-', label = 'osci_simu data(2D Newton fitted)')
-plt.plot(e_list,data_os_3, 'k-', label = 'osci_simu data(3D Newton fitted)')
-
-
-plt.xlabel('energy (GeV)')
+plt.xlabel('Energy (GeV)')
 plt.ylabel('# of muons')
-plt.title('the osci_simu data vs. energy (Using 2D fit (Newton))')
+plt.title('The T2K data and fitted data')
 
 #adding the real data for comparison
-plt.bar(e_list,data_oe, width = .06, label = 'exp data')
+plt.bar(e_list,data_oe, width = .06, label = 'T2K data')
 
 plt.legend()
 plt.show()
@@ -1268,7 +1288,7 @@ u_monte_3D, path_x_monte_3D, path_y_monte_3D, path_z_monte_3D = mon_car_3D(NLL_3
 def path_acc_3D(path_x_monte_3D, path_y_monte_3D, path_z_monte_3D, method_name = ''):
     scatter3d(np.ndarray.flatten(X3),np.ndarray.flatten(Y3),np.ndarray.flatten(Z3), np.ndarray.flatten(f_list), colorsMap='jet') # The background scattering points with
                                                                                                                               # color need not to be changed
-    plt.plot(path_x_monte_3D, path_y_monte_3D, path_z_monte_3D, 'r-',linewidth=3)
+    plt.plot(path_x_monte_3D, path_y_monte_3D, path_z_monte_3D, 'r-',linewidth=3, label = 'Monte path')
     plt.plot(path_x_monte_3D[-1], path_y_monte_3D[-1], path_z_monte_3D[-1], 'ro', markersize = 10)
     
     
@@ -1294,5 +1314,114 @@ plt.show()
 
 
 
+#%%
+
+'''
+---------------------------------------------------------------------------------------------------------
 
 
+Plotting 2D paths together--------------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+
+
+'''
+
+
+
+
+
+
+
+
+
+#%%
+
+N = 100
+
+m_list = np.linspace(.001, .005, N)           
+th_list = np.linspace(.55, 1, N)       
+
+       
+X, Y = np.meshgrid(m_list, th_list)
+Z_t = np.ones((N,N))
+
+Z = np.zeros((N,N))
+for i in range(N):
+    for j in range(N):
+        #print([th_list[i], m_list[j]])
+        Z[j,i] = NLL([th_list[j], m_list[i]], data_oe, 'th&m')
+        # Note that the index and coordinate are inver in order
+        
+# plotting the contour map      
+font = {
+        'size'   : 15}
+
+matplotlib.rc('font', **font)
+plt.figure(figsize = (18,6))    
+cs = plt.contourf(X, Y, Z, 15 , 
+                  #hatches =['-', '/','\\', '//'],
+                  cmap ='Greens')
+plt.locator_params(axis='both', nbins=6)
+cbar = plt.colorbar(cs, label = 'Magnitude of NLL')
+plt.xlabel(r'$\Delta m_{23}^2$')
+plt.ylabel(r'$\theta_{23}$')
+plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ ')
+plt.show()
+
+
+plt.plot(path_y_u,path_x_u,  'r-', label = 'Univariate path')
+plt.plot(path_y_n,path_x_n,  'b-', label = 'Newton path')
+plt.plot(path_y_m,path_x_m,  'y-', label = 'Monte path')
+plt.legend()
+
+#%%
+
+cs = plt.contourf(X, Y, Z, 15 , 
+                  #hatches =['-', '/','\\', '//'],
+                  cmap ='Greens')
+plt.locator_params(axis='both', nbins=6)
+cbar = plt.colorbar(cs, label = 'Magnitude of NLL')
+plt.xlabel(r'$\Delta m_{23}^2$')
+
+plt.ylabel(r'$\theta_{23}$')
+plt.title(r'NLL vs. $\Delta m_{23}^2$ and $\theta_{23}$ Zoomed (Univariate)')
+
+
+
+plt.xlim([0.0022, 0.00235])
+plt.ylim([0.79, 0.81])
+plt.legend()
+
+plt.locator_params(axis='both', nbins=4)
+plt.plot(path_y_u,path_x_u,  'r-', label = 'univariate path')
+plt.plot(path_y_n,path_x_n,  'b-', label = 'newton path')
+plt.plot(path_y_m,path_x_m,  'y-', label = 'monte path')
+plt.show()
+
+
+
+#%%
+
+'''
+---------------------------------------------------------------------------------------------------------
+
+
+Plotting 3D paths together--------------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+
+
+'''
+
+#%%
+font = {
+        'size'   : 14}
+
+
+
+matplotlib.rc('font', **font)
+path_acc_3D(path_x_monte_3D, path_y_monte_3D, path_z_monte_3D, 'Monte Method 3D')
+plt.plot(path_x, path_y, path_z, 'b-',linewidth=3, label = 'Newton path')
+plt.plot(path_x[-1], path_y[-1], path_z[-1], 'bo', markersize = 10)
+plt.legend()
